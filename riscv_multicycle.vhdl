@@ -322,8 +322,8 @@ begin
     
     not_equal_result <= '1' when (id_ex_reg1_data /= id_ex_reg2_data) else '0';
     
-    --next_pc <= std_logic_vector(signed(NPC) + signed(imm)) when (state = MEMORY and branch = '1' and not_equal_result = '1') else
     next_pc <= std_logic_vector(signed(NPC) + shift_left(signed(imm), 1)) when (state = MEMORY and branch = '1' and not_equal_result = '1') else
+                -- You have to shift to the left by one cause the immediate generator code is no good...
                std_logic_vector(signed(NPC) + signed(imm)) when (state = MEMORY and jump = '1') else
                NPC when state = MEMORY else
                next_pc;  -- otherwise, keep the same pc until time to update  -- maybe the little dout1 and dout2 thing

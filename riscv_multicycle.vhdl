@@ -1,6 +1,6 @@
 ---------------------------------------------------------------------------------------
 -- Final Project Stage 1: RISCV_Multicycle
--- AUTHOR: 
+-- AUTHOR: Modified by C1C John L. Rust III, USAF (original code by Dr. George York, DFEC)
 -- DESCRIPTION:
 --   Implementation of a 5 stage RISC-V multicycle architecture (IF-ID-EX-MEM-WB)
 --   that is NOT pipelined [all 5 stages of the first instruction completes before
@@ -94,7 +94,7 @@ architecture Behavioral of riscv_multicycle is
 
     -- Additional signals
 
-     
+     signal not_equal_result : STD_LOGIC;
 
 
     
@@ -233,16 +233,16 @@ begin
 
     -------------------------- ID state hardware ---------------------------------------------
     -- Decode instruction fields
-    rs1 <= if_id_instr(<define bit> downto <define bit>);
-    rs2 <= if_id_instr(<define bit> downto <define bit>);
-    rd  <= if_id_instr(<define bit> downto <define bit>);
-    opcode <= if_id_instr(<define bit> downto <define bit>);
+    rs1 <= if_id_instr(19 downto 15);
+    rs2 <= if_id_instr(24 downto 20);
+    rd  <= if_id_instr(11 downto 7);
+    opcode <= if_id_instr(6 downto 0);
 
     -- ALU control unit
     alu_control_inst: alu_control
         port map (
-            funct3 => if_id_instr(<define bit> downto <define bit>),
-            funct7 => if_id_instr(<define bit> downto <define bit>),
+            funct3 => if_id_instr(14 downto 12),
+            funct7 => if_id_instr(31 downto 25),
             alu_op => alu_op
         );
 
@@ -254,7 +254,7 @@ begin
             rs1       => rs1,
             rs2       => rs2,
             rd        => wb_rd,
-            data_in   => <which_register>,  -- see writeback stage where mux selects correct value to write to register
+            data_in   => wb_data,  -- see writeback stage where mux selects correct value to write to register
             data_out1 => reg1_data,
             data_out2 => reg2_data
         );
@@ -288,8 +288,8 @@ begin
     
     alu_input_a <= reg1_data;
     -- mux to select alu input B
-    alu_input_b <= <which_register> when <which_control_signal> else
-                   <which_register>;
+    alu_input_b <= reg2_data when (alu_src = '0') else
+                   imm;
     -- ALU
     alu_inst: alu
         port map (
@@ -310,7 +310,7 @@ begin
     data_mem_inst: data_mem
         port map (
             addr      => data_memory_byte_not_word,
-            data_in   => <which_register?>,
+            data_in   => reg2_data,
             data_out  => mem_data,
             mem_read  => mem_read,
             mem_write => mem_write_chip  -- write is dangerous... only want to do this on a specific clock cycle
@@ -318,11 +318,15 @@ begin
 
     -- Moore Machine, outputs determined by State
     -- MEMORY
-    mem_write_chip <= '1' when (state = MEMORY and <what control signals?>) else '0';  -- ensure only write to memory during this state
-    next_pc <= <math based on NPC and imm> when (state = MEMORY and <when do we want to branch?>) else
-               <math based on NPC and imm> when (state = MEMORY and <when do we want to jump?>) else
-               NPC when state = MEMORY and <when do we want to do PC+4?> else
-               next_pc;  -- otherwise, keep the same pc until time to update
+    mem_write_chip <= '1' when (state = MEMORY and mem_write = '1') else '0';  -- ensure only write to memory during this state
+    
+    not_equal_result <= '1' when (id_ex_reg1_data /= id_ex_reg2_data) else '0';
+    
+    --next_pc <= std_logic_vector(signed(NPC) + signed(imm)) when (state = MEMORY and branch = '1' and not_equal_result = '1') else
+    next_pc <= std_logic_vector(signed(NPC) + shift_left(signed(imm), 1)) when (state = MEMORY and branch = '1' and not_equal_result = '1') else
+               std_logic_vector(signed(NPC) + signed(imm)) when (state = MEMORY and jump = '1') else
+               NPC when state = MEMORY else
+               next_pc;  -- otherwise, keep the same pc until time to update  -- maybe the little dout1 and dout2 thing
 
     -------------------------- WB state hardware ---------------------------------------------
     -- MEM/WB pipeline register
@@ -330,12 +334,14 @@ begin
     mem_wb_data <= mem_data;
 
     -- Moore Machine, outputs determined by State
-    reg_write_chip <= '1' when (state = WRITEBACK and <what control signals?>) else '0'; -- ensure only write to registers during this state
+                                                    
+    reg_write_chip <= '1' when (state = WRITEBACK and reg_write = '1') else '0'; -- ensure only write to registers during this state
     if_id_pc   <= next_pc when state = WRITEBACK else if_id_pc; -- only lets this update during WRITEBACK
-    wb_data <= x"10000000" when (state = WRITEBACK and <what control signals?>) else
-               mem_wb_data when (state = WRITEBACK and <what control signals?>) else
-               mem_wb_alu  when (state = WRITEBACK and <what control signals?>) else
+    
+    wb_data <= x"10000000" when (state = WRITEBACK and load_addr = '1') else
+               mem_wb_data when (state = WRITEBACK and mem_read = '1') else
+               mem_wb_alu  when (state = WRITEBACK and reg_write = '1') else
                wb_data;  -- only allow this to change during Writeback
 
-    wb_rd   <= if_id_instr(<define bit> downto <define bit>); -- Destination register
+    wb_rd   <= if_id_instr(11 downto 7); -- Destination register
 end Behavioral;

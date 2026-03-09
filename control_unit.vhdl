@@ -6,13 +6,13 @@ use IEEE.NUMERIC_STD.ALL;
 entity control_unit is
     Port (
         opcode      : in  STD_LOGIC_VECTOR(6 downto 0);
-        reg_write   : out STD_LOGIC;
-        mem_read    : out STD_LOGIC;
-        mem_write   : out STD_LOGIC;
-        alu_src     : out STD_LOGIC;
-        branch      : out STD_LOGIC;
-        load_addr   : out STD_LOGIC;
-        jump        : out STD_LOGIC
+        reg_write   : out STD_LOGIC; -- used and converted to reg_write_chip
+        mem_read    : out STD_LOGIC; -- used
+        mem_write   : out STD_LOGIC; -- used and converted to mem_write_chip
+        alu_src     : out STD_LOGIC; -- used
+        branch      : out STD_LOGIC; --used
+        load_addr   : out STD_LOGIC; --used
+        jump        : out STD_LOGIC  --used
     );
 end control_unit;
 
